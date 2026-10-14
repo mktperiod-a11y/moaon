@@ -1,0 +1,59 @@
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${BASE_URL%/}"
+          case "$BASE_URL" in
+            https://*) ;;
+            *) echo "::error::Pages base_url을 가져오지 못해 배포를 멈춥니다."; exit 1 ;;
+          esac
+
+          mkdir _site
+          git archive HEAD | tar -x -C _site
+          rm -rf _site/.github _site/README.md
+
+          grep -rlZ 'https://site-url\.invalid' _site \
+            | xargs -0 -r sed -i "s|https://site-url\.invalid|${BASE_URL}|g"
+
+          if grep -rl 'site-url\.invalid' _site; then
+            echo "::error::자리표시 주소가 남아 있어 배포를 멈춥니다."
+            exit 1
+          fi
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
