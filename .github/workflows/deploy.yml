@@ -20,6 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: 개인정보 규칙 검사
+        env:
+          PRIVACY_PATTERNS: ${{ secrets.PRIVACY_PATTERNS }}
+        run: python3 .github/scripts/privacy_check.py files
+
       - id: pages
         uses: actions/configure-pages@v5
 
@@ -36,7 +41,7 @@ jobs:
 
           mkdir _site
           git archive HEAD | tar -x -C _site
-          rm -rf _site/.github _site/README.md
+          rm -rf _site/.github _site/README.md _site/CLAUDE.md
 
           grep -rlZ 'https://site-url\.invalid' _site \
             | xargs -0 -r sed -i "s|https://site-url\.invalid|${BASE_URL}|g"
